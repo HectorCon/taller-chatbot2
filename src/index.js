@@ -1,11 +1,37 @@
 const { useMultiFileAuthState, default: makeWASocket, DisconnectReason } = require("baileys")
 global.crypto = require("crypto");
+const qrcode = require("qrcode-terminal");
 
 const userContext = {}; 
 
 async function connectToWhatsApp () {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys')
+
+
     const sock = makeWASocket({
+        auth: state
+    });
+
+   // ✅ Mostrar QR y manejar conexión
+    sock.ev.on("connection.update", (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+            qrcode.generate(qr, { small: true });
+        }
+
+        if (connection === "close") {
+            const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log("Conexión cerrada por", lastDisconnect?.error, ", reconectando:", shouldReconnect);
+            if (shouldReconnect) {
+                connectToWhatsApp();
+            }
+        } else if (connection === "open") {
+            console.log("✅ CONEXIÓN ABIERTA!!!");
+        }
+    });
+    
+    /* const sock = makeWASocket({
         // can provide additional config here
         auth: state,
         printQRInTerminal: true
@@ -23,7 +49,7 @@ async function connectToWhatsApp () {
         } else if(connection === 'open') {
             console.log('CONEXION ABIERTA!!!')
         }
-    });
+    }); */
 
     sock.ev.on('messages.upsert', async event => {
         for (const m of event.messages) {
